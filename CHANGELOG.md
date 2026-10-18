@@ -2,11 +2,64 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [1.7.0] - 2026-10-18
 
-### 🐛 Bug Fixes
+A performance, smoothness and stability release. Every gesture, screen transition and list in the launcher was reviewed. This release fixes several crashes, does far less work in the background, animates more smoothly and makes the app smaller.
 
-- *(CI)* Changelog
+### 🐛 Crash Fixes
+
+- Double tap and long press on the home screen no longer crash. Their actions ran on short lived background threads, so a double tap set to "Show app list" or "Open app" could take the launcher down.
+- Swiping no longer crashes when Android reports a gesture without a start point.
+- Tapping an app twice quickly in the drawer, or swiping twice quickly on the home screen, can no longer stack screens or leave a blank home screen.
+- Settings with corrupt values, or values from an older backup, fall back to their defaults instead of crashing at startup.
+- Uninstall, app info, accessibility settings and backup actions show a message instead of crashing when no app can handle them.
+
+### 🛡️ Stability
+
+- Loading an invalid backup file no longer wipes your settings. The file is checked first, and only a real OlauncherCF backup replaces them.
+- Backups made by earlier versions still load.
+- The home screen releases its views while another screen is shown, instead of keeping them in memory.
+- One broken or paused work profile no longer stops the whole app list from loading.
+
+### ⚡ Performance
+
+- The app list is loaded once and cached. Hiding, unhiding and renaming apps now update it instantly instead of reloading every app from the system.
+- App installs, updates and removals are tracked with the official launcher API. A burst of updates (common while the Play Store updates apps) now causes one reload instead of one per event.
+- Gestures no longer start a new thread each time.
+- Home screen apps and gesture apps no longer make a system call every time they are read.
+- Searching the drawer prepares its search data in the background, only once you start typing, and opening the drawer needs none of it.
+- Scrolling the drawer does less work per row.
+- The app list is preloaded after the home screen has drawn, so it does not slow down startup.
+- Pressing home returns to the launcher faster (`resumeWhilePausing`), and Android no longer needs to save and restore the launcher's state (`stateNotNeeded`).
+
+### 🔋 Resource Usage
+
+- Smaller app: Gson, ConstraintLayout (Views and Compose), Navigation UI, WorkManager and lifecycle-extensions were removed, and test libraries no longer ship inside the app.
+- The optional accessibility service (used for lock screen and recents) now asks for the minimum: no access to window content and a single rare event type. Every enabled accessibility service adds work to the whole system, so this reduces overhead outside the launcher too.
+
+### 🎨 Animations
+
+- New screen transitions: the app drawer and settings rise gently into place and sink away when closed, using hardware layers so they stay smooth.
+- Settings sections expand and collapse smoothly instead of jumping.
+- The "list empty" message no longer flashes every time the drawer opens.
+- Long pressing a home app or the home screen gives haptic feedback.
+
+### 🔧 Fixes
+
+- Lowering the number of apps on the home screen now actually removes the extra apps.
+- Hidden apps are no longer lost when restoring a backup.
+- Chinese, Greek and Swedish translations now load (they used incorrect language codes). Translations with regional variants also load on Android 6.
+- New apps installed in a work profile now appear without restarting the launcher.
+- Names given to apps in the drawer now also show on the home screen. Renaming an app from the home screen still overrides it.
+- Choosing a home screen app now reliably includes hidden apps when it should.
+- Double tap reacts immediately instead of waiting 300 ms for a possible triple tap.
+- Swipe distances are based on screen density, so swipes feel the same on every phone.
+- Tablet detection uses the standard Android definition.
+
+### ⚙️ Miscellaneous Tasks
+
+- *(CI)* Update GitHub Actions to current versions and make the release and emulator test workflows manual.
+- *(CI)* Changelog fixes carried over from upstream.
 
 ## [1.6.12] - 2024-03-02
 

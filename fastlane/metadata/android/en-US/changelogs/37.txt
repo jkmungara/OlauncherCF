@@ -1,0 +1,8 @@
+Performance, smoothness and stability release.
+
+- Fixes crashes from double tap, long press and swipes
+- Invalid backups no longer wipe settings
+- App list cached and updated instantly; far less background work
+- Smoother screen transitions and settings animations
+- Smaller app
+- Home app count, hidden app restore and Chinese, Greek and Swedish translations fixed
