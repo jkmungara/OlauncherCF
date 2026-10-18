@@ -17,14 +17,22 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
 
+        <!--
+            stateNotNeeded: like the AOSP launcher, nothing needs restoring after a restart,
+            so the system can skip saving and restoring state for it.
+            resumeWhilePausing: home can start resuming while the app being left is still
+            pausing, which makes pressing home feel faster.
+        -->
         <activity
             android:name="app.olaunchercf.MainActivity"
             android:configChanges="uiMode"
             android:excludeFromRecents="true"
+            android:exported="true"
             android:launchMode="singleTask"
+            android:resumeWhilePausing="true"
+            android:stateNotNeeded="true"
             android:taskAffinity=""
-            android:windowSoftInputMode="stateHidden"
-            android:exported="true">
+            android:windowSoftInputMode="stateHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

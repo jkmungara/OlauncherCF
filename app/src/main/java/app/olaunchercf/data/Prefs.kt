@@ -5,8 +5,9 @@ import android.content.SharedPreferences
 import android.os.UserHandle
 import android.util.Log
 import app.olaunchercf.helper.getUserHandleFromString
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
 
 private const val APP_LANGUAGE = "app_language"
 private const val PREFS_FILENAME = "app.olauncher"
@@ -55,33 +56,73 @@ private const val DOUBLE_TAP = "DOUBLE_TAP"
 
 private const val TEXT_SIZE = "text_size"
 
+private const val TAG = "Prefs"
+
+// Used to tell an Olauncher backup apart from some other JSON file before wiping anything.
+private val BACKUP_MARKER_KEYS = setOf(
+    APP_LANGUAGE, FIRST_OPEN, FIRST_SETTINGS_OPEN, HOME_APPS_NUM, HOME_ALIGNMENT, DRAWER_ALIGNMENT,
+    TIME_ALIGNMENT, SHOW_DATE, SHOW_TIME, SWIPE_LEFT_ACTION, SWIPE_RIGHT_ACTION, SWIPE_UP_ACTION,
+    SWIPE_DOWN_ACTION, DOUBLE_TAP_ACTION, HIDDEN_APPS, APP_THEME, TEXT_SIZE,
+)
+
 class Prefs(val context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_FILENAME, 0)
 
+    /** Serialises every setting to JSON. The format matches older (Gson based) backups. */
     fun saveToString(): String {
-        val all: HashMap<String, Any?> = HashMap(prefs.all)
-        return Gson().toJson(all)
-    }
-
-    fun loadFromString(json: String) {
-        val editor = prefs.edit()
-        val all: HashMap<String, Any?> = Gson().fromJson(json, object : TypeToken<HashMap<String, Any?>>() {}.type)
-        for ((key, value) in all) {
+        val json = JSONObject()
+        for ((key, value) in prefs.all) {
             when (value) {
-                is String -> editor.putString(key, value)
-                is Boolean -> editor.putBoolean(key, value)
-                is Int -> editor.putInt(key, value)
-                is Double -> editor.putInt(key, value.toInt()) // we store everything as int
-                is Float -> editor.putInt(key, value.toInt())
-                is MutableSet<*> -> {
-                    val list = value.filterIsInstance<String>().toSet()
-                    editor.putStringSet(key, list)
-                }
-                else ->  { Log.d("backup error", "$value") }
+                null -> continue
+                is Set<*> -> json.put(key, JSONArray(value.filterIsInstance<String>()))
+                else -> json.put(key, value)
             }
         }
+        return json.toString()
+    }
+
+    /**
+     * Replaces every setting with the ones in [json].
+     * Returns false and leaves the current settings untouched if [json] is not a valid backup.
+     */
+    fun loadFromString(json: String): Boolean {
+        val backup = try {
+            JSONObject(json)
+        } catch (e: JSONException) {
+            Log.w(TAG, "Invalid backup", e)
+            return false
+        }
+
+        if (BACKUP_MARKER_KEYS.none { backup.has(it) }) {
+            Log.w(TAG, "Not an Olauncher backup")
+            return false
+        }
+
+        // clear() is always applied before the puts, whatever order they are called in
+        val editor = prefs.edit().clear()
+        val keys = backup.keys()
+
+        while (keys.hasNext()) {
+            val key = keys.next()
+            when (val value = backup.opt(key)) {
+                is String -> editor.putString(key, value)
+                is Boolean -> editor.putBoolean(key, value)
+                // every number we store is an Int
+                is Number -> editor.putInt(key, value.toInt())
+                is JSONArray -> {
+                    val set = HashSet<String>(value.length())
+                    for (i in 0 until value.length()) {
+                        value.optString(i, null)?.let { set.add(it) }
+                    }
+                    editor.putStringSet(key, set)
+                }
+                else -> Log.d(TAG, "Skipping backup value for $key")
+            }
+        }
+
         editor.apply()
+        return true
     }
 
     // this is a true-once-false-after variable
@@ -119,17 +160,7 @@ class Prefs(val context: Context) {
         set(value) = prefs.edit().putInt(HOME_APPS_NUM, value).apply()
 
     var homeAlignment: Constants.Gravity
-        get() {
-            return try {
-                val string = prefs.getString(
-                    HOME_ALIGNMENT,
-                    Constants.Gravity.Left.name
-                ).toString()
-                Constants.Gravity.valueOf(string)
-            } catch (_: Exception) {
-                Constants.Gravity.Left
-            }
-        }
+        get() = loadEnum(HOME_ALIGNMENT, Constants.Gravity.Left)
         set(value) = prefs.edit().putString(HOME_ALIGNMENT, value.toString()).apply()
 
     var homeAlignmentBottom: Boolean
@@ -141,23 +172,11 @@ class Prefs(val context: Context) {
         set(value) = prefs.edit().putBoolean(HOME_CLICK_AREA, value).apply()
 
     var clockAlignment: Constants.Gravity
-        get() {
-            val string = prefs.getString(
-                TIME_ALIGNMENT,
-                Constants.Gravity.Left.name
-            ).toString()
-            return Constants.Gravity.valueOf(string)
-        }
+        get() = loadEnum(TIME_ALIGNMENT, Constants.Gravity.Left)
         set(value) = prefs.edit().putString(TIME_ALIGNMENT, value.toString()).apply()
 
     var drawerAlignment: Constants.Gravity
-        get() {
-            val string = prefs.getString(
-                DRAWER_ALIGNMENT,
-                Constants.Gravity.Right.name
-            ).toString()
-            return Constants.Gravity.valueOf(string)
-        }
+        get() = loadEnum(DRAWER_ALIGNMENT, Constants.Gravity.Right)
         set(value) = prefs.edit().putString(DRAWER_ALIGNMENT, value.name).apply()
 
     var showStatusBar: Boolean
@@ -175,24 +194,6 @@ class Prefs(val context: Context) {
     var homeLocked: Boolean
         get() = prefs.getBoolean(HOME_LOCKED, false)
         set(value) = prefs.edit().putBoolean(HOME_LOCKED, value).apply()
-
-    /*
-    var swipeLeftEnabled: Boolean
-        get() = prefs.getBoolean(SWIPE_LEFT_ENABLED, true)
-        set(value) = prefs.edit().putBoolean(SWIPE_LEFT_ENABLED, value).apply()
-
-    var swipeRightEnabled: Boolean
-        get() = prefs.getBoolean(SWIPE_RIGHT_ENABLED, true)
-        set(value) = prefs.edit().putBoolean(SWIPE_RIGHT_ENABLED, value).apply()
-
-    var clickClockEnabled: Boolean
-        get() = prefs.getBoolean(CLICK_CLOCK_ENABLED, true)
-        set(value) = prefs.edit().putBoolean(CLICK_CLOCK_ENABLED, value).apply()
-
-    var clickDateEnabled: Boolean
-        get() = prefs.getBoolean(CLICK_DATE_ENABLED, true)
-        set(value) = prefs.edit().putBoolean(CLICK_DATE_ENABLED, value).apply()
-     */
 
     var swipeLeftAction: Constants.Action
         get() = loadAction(SWIPE_LEFT_ACTION, Constants.Action.OpenApp)
@@ -223,11 +224,17 @@ class Prefs(val context: Context) {
         set(value) = storeAction(DOUBLE_TAP_ACTION, value)
 
     private fun loadAction(prefString: String, default: Constants.Action): Constants.Action {
-        val string = prefs.getString(
-            prefString,
-            default.toString()
-        ).toString()
-        return Constants.Action.valueOf(string)
+        return loadEnum(prefString, default)
+    }
+
+    // Corrupt values or values from an old backup fall back to the default instead of crashing.
+    private inline fun <reified T : Enum<T>> loadEnum(key: String, default: T): T {
+        return try {
+            val name = prefs.getString(key, null) ?: return default
+            enumValueOf<T>(name)
+        } catch (_: Exception) {
+            default
+        }
     }
 
     private fun storeAction(prefString: String, value: Constants.Action) {
@@ -235,28 +242,18 @@ class Prefs(val context: Context) {
     }
 
     var appTheme: Constants.Theme
-        get() {
-            return try {
-                Constants.Theme.valueOf(prefs.getString(APP_THEME, Constants.Theme.System.name).toString())
-            } catch (_: Exception) {
-                Constants.Theme.System
-            }
-        }
+        get() = loadEnum(APP_THEME, Constants.Theme.System)
         set(value) = prefs.edit().putString(APP_THEME, value.name).apply()
 
     var language: Constants.Language
-        get() {
-            return try {
-                Constants.Language.valueOf(prefs.getString(APP_LANGUAGE, Constants.Language.English.name).toString())
-            } catch (_: Exception) {
-                Constants.Language.English
-            }
-        }
+        get() = loadEnum(APP_LANGUAGE, Constants.Language.English)
         set(value) = prefs.edit().putString(APP_LANGUAGE, value.name).apply()
 
+    // Always a copy: editing the set returned by getStringSet() and storing it again
+    // is a known SharedPreferences bug where the change is never persisted.
     var hiddenApps: MutableSet<String>
-        get() = prefs.getStringSet(HIDDEN_APPS, mutableSetOf()) as MutableSet<String>
-        set(value) = prefs.edit().putStringSet(HIDDEN_APPS, value).apply()
+        get() = HashSet(prefs.getStringSet(HIDDEN_APPS, null) ?: emptySet())
+        set(value) = prefs.edit().putStringSet(HIDDEN_APPS, HashSet(value)).apply()
 
     var hiddenAppsUpdated: Boolean
         get() = prefs.getBoolean(HIDDEN_APPS_UPDATED, false)
@@ -271,8 +268,11 @@ class Prefs(val context: Context) {
     }
 
     fun setHomeAppName(i: Int, name: String) {
-        val nameId = "${APP_NAME}_$i"
-        prefs.edit().putString(nameId, name).apply()
+        // Clear the alias too, otherwise it would keep hiding the new name.
+        prefs.edit()
+            .putString("${APP_NAME}_$i", name)
+            .putString("${APP_ALIAS}_$i", "")
+            .apply()
     }
 
     var appSwipeRight: AppModel
@@ -315,10 +315,9 @@ class Prefs(val context: Context) {
         return AppModel(
             appLabel = name,
             appPackage = pack,
-            appAlias = alias,
             appActivityName = activity,
             user = userHandle,
-            key = null,
+            appAlias = alias,
         )
     }
 
@@ -343,13 +342,14 @@ class Prefs(val context: Context) {
         set(value) = prefs.edit().putInt(TEXT_SIZE, value).apply()
 
 
-    // return app label
-    fun getAppName(location: Int): String {
-        return getHomeAppModel(location).appLabel
-    }
-
     fun getAppAlias(appName: String): String {
-        return prefs.getString(appName, "").toString()
+        // Aliases share the key space with settings; an app label that happens to match
+        // an Int or Boolean setting's key must not break loading the whole app list.
+        return try {
+            prefs.getString(appName, "").orEmpty()
+        } catch (_: ClassCastException) {
+            ""
+        }
     }
     fun setAppAlias(appPackage: String, appAlias: String) {
         prefs.edit().putString(appPackage, appAlias).apply()

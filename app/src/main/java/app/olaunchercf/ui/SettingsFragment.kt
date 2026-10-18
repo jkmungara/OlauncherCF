@@ -1,19 +1,15 @@
 package app.olaunchercf.ui
 
 import SettingsTheme
-import android.app.Activity
+import android.animation.Animator
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ScrollView
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -26,7 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -80,6 +76,15 @@ class SettingsFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
+        viewModel.isOlauncherDefault()
+
+        deviceManager = requireContext().getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
+        componentName = ComponentName(requireContext(), DeviceAdmin::class.java)
+        checkAdminPermission()
+
+        // Dispose with the fragment's view, not whenever the window detaches.
+        binding.testView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
         binding.testView.setContent {
 
             val isDark = when (prefs.appTheme) {
@@ -107,13 +112,19 @@ class SettingsFragment : Fragment() {
             (fs.value.value * 1.5).sp
         } else fs.value */
 
-        val changeLauncherText = if (isOlauncherDefault(requireContext())) {
+        // A PackageManager query; once per screen is enough, not once per recomposition.
+        val isDefaultLauncher = remember { isOlauncherDefault(requireContext()) }
+        val changeLauncherText = if (isDefaultLauncher) {
             R.string.change_default_launcher
         } else {
-           R.string.set_as_default_launcher
+            R.string.set_as_default_launcher
         }
 
-        Column {
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(top = 20.dp, bottom = 10.dp)
+        ) {
             SettingsTopView(
                 stringResource(R.string.app_name),
                 onClick = { openAppInfo(requireContext(), android.os.Process.myUserHandle(), BuildConfig.APPLICATION_ID) },
@@ -369,26 +380,15 @@ class SettingsFragment : Fragment() {
                 modifier = Modifier
                     .align(Alignment.End)
                     .padding(10.dp, 5.dp),
-                text = "Version: ${requireContext().packageManager.getPackageInfo(requireContext().packageName, 0).versionName}",
+                text = "Version: ${BuildConfig.VERSION_NAME}",
 
                 color = Color.DarkGray
             )
         }
     }
 
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
-        prefs = Prefs(requireContext())
-        viewModel = activity?.run {
-            ViewModelProvider(this).get(MainViewModel::class.java)
-        } ?: throw Exception("Invalid Activity")
-
-        viewModel.isOlauncherDefault()
-
-        deviceManager = context?.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        componentName = ComponentName(requireContext(), DeviceAdmin::class.java)
-        checkAdminPermission()
-    }
+    override fun onCreateAnimator(transit: Int, enter: Boolean, nextAnim: Int): Animator? =
+        createLayeredAnimator(nextAnim)
 
     override fun onDestroyView() {
         super.onDestroyView()
@@ -429,11 +429,17 @@ class SettingsFragment : Fragment() {
     }
 
     private fun showHiddenApps() {
-        viewModel.getHiddenApps()
-        findNavController().navigate(
-            R.id.action_settingsFragment_to_appListFragment,
-            bundleOf("flag" to AppDrawerFlag.HiddenApps.toString())
-        )
+        navigateFromSettings(bundleOf("flag" to AppDrawerFlag.HiddenApps.toString()))
+    }
+
+    // Only from this screen, so a quick double tap cannot open the drawer twice.
+    private fun navigateFromSettings(args: Bundle) {
+        if (!isAdded) return
+
+        val navController = findNavController()
+        if (navController.currentDestination?.id == R.id.settingsFragment) {
+            navController.navigate(R.id.action_settingsFragment_to_appListFragment, args)
+        }
     }
 
     private fun checkAdminPermission() {
@@ -484,15 +490,8 @@ class SettingsFragment : Fragment() {
                 AppDrawerFlag.LaunchApp -> {}
         }
 
-        when(action) {
-            Action.OpenApp -> {
-                viewModel.getAppList()
-                findNavController().navigate(
-                    R.id.action_settingsFragment_to_appListFragment,
-                    bundleOf("flag" to flag.toString())
-                )
-            }
-            else -> {}
+        if (action == Action.OpenApp) {
+            navigateFromSettings(bundleOf("flag" to flag.toString()))
         }
     }
 }

@@ -1,22 +1,23 @@
 package app.olaunchercf.ui
 
+import android.animation.Animator
 import android.annotation.SuppressLint
 import android.app.admin.DevicePolicyManager
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
-import android.os.Vibrator
+import android.util.Log
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.os.bundleOf
 import androidx.core.view.children
-import androidx.core.view.size
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import app.olaunchercf.MainViewModel
 import app.olaunchercf.R
@@ -25,26 +26,36 @@ import app.olaunchercf.data.Constants.Action
 import app.olaunchercf.data.Constants.AppDrawerFlag
 import app.olaunchercf.data.Prefs
 import app.olaunchercf.databinding.FragmentHomeBinding
-import app.olaunchercf.helper.*
+import app.olaunchercf.helper.ActionService
+import app.olaunchercf.helper.expandNotificationDrawer
+import app.olaunchercf.helper.expandQuickSettings
+import app.olaunchercf.helper.hideStatusBar
+import app.olaunchercf.helper.initActionService
+import app.olaunchercf.helper.isOlauncherDefault
+import app.olaunchercf.helper.openAccessibilitySettings
+import app.olaunchercf.helper.openAlarmApp
+import app.olaunchercf.helper.openCalendar
+import app.olaunchercf.helper.openCameraApp
+import app.olaunchercf.helper.openDialerApp
+import app.olaunchercf.helper.showStatusBar
+import app.olaunchercf.helper.showToastLong
+import app.olaunchercf.helper.showToastShort
 import app.olaunchercf.listener.OnSwipeTouchListener
 import app.olaunchercf.listener.ViewSwipeTouchListener
-import kotlinx.coroutines.launch
 
+private const val TAG = "HomeFragment"
 
-class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener {
+class HomeFragment : Fragment(), View.OnClickListener {
 
     private lateinit var prefs: Prefs
     private lateinit var viewModel: MainViewModel
     private lateinit var deviceManager: DevicePolicyManager
-    private lateinit var vibrator: Vibrator
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
-
-        val view = binding.root
         prefs = Prefs(requireContext())
 
         if (prefs.firstSettingsOpen()) {
@@ -52,25 +63,25 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
             binding.setDefaultLauncher.visibility = View.GONE
         }
 
-        return view
+        return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-
-        viewModel = activity?.run {
-            ViewModelProvider(this)[MainViewModel::class.java]
-        } ?: throw Exception("Invalid Activity")
-
-        deviceManager = context?.getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        vibrator = context?.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        viewModel = ViewModelProvider(requireActivity())[MainViewModel::class.java]
+        deviceManager = requireContext().getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
 
         initObservers()
 
-        initSwipeTouchListener()
-        initClickListeners()
+        binding.touchArea.setOnTouchListener(getHomeScreenGestureListener(requireContext()))
+        binding.clock.setOnClickListener(this)
+        binding.date.setOnClickListener(this)
+        binding.setDefaultLauncher.setOnClickListener(this)
     }
+
+    override fun onCreateAnimator(transit: Int, enter: Boolean, nextAnim: Int): Animator? =
+        createLayeredAnimator(nextAnim)
 
     override fun onStart() {
         super.onStart()
@@ -78,7 +89,6 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
 
         binding.clock.textSize = prefs.textSize * 2.5f
         binding.date.textSize = prefs.textSize.toFloat()
-
     }
 
     override fun onResume() {
@@ -91,50 +101,18 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
         }
     }
 
+    override fun onDestroyView() {
+        super.onDestroyView()
+        // The fragment outlives its view while another screen is shown; don't keep the old views alive.
+        _binding = null
+    }
+
     override fun onClick(view: View) {
         when (view.id) {
-            R.id.clock -> {
-                when (val action = prefs.clickClockAction) {
-                    Action.OpenApp -> openClickClockApp()
-                    else -> handleOtherAction(action)
-                }
-            }
-            R.id.date -> {
-                when (val action = prefs.clickDateAction) {
-                    Action.OpenApp -> openClickDateApp()
-                    else -> handleOtherAction(action)
-                }
-            }
+            R.id.clock -> performAction(prefs.clickClockAction, ::openClickClockApp)
+            R.id.date -> performAction(prefs.clickDateAction, ::openClickDateApp)
             R.id.setDefaultLauncher -> viewModel.resetDefaultLauncherApp(requireContext())
-            else -> {
-                try { // Launch app
-                    val appLocation = view.id.toString().toInt()
-                    homeAppClicked(appLocation)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
         }
-    }
-
-    override fun onLongClick(view: View): Boolean {
-        if (prefs.homeLocked) return true
-
-        val n = view.id
-        val name = prefs.getHomeAppModel(n).appLabel
-        showAppList(AppDrawerFlag.SetHomeApp, name.isNotEmpty(), n)
-        return true
-    }
-
-    private fun initSwipeTouchListener() {
-        val context = requireContext()
-        binding.touchArea.setOnTouchListener(getHomeScreenGestureListener(context))
-    }
-
-    private fun initClickListeners() {
-        binding.clock.setOnClickListener(this)
-        binding.date.setOnClickListener(this)
-        binding.setDefaultLauncher.setOnClickListener(this)
     }
 
     private fun initObservers() {
@@ -143,8 +121,8 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
                 binding.dateTimeLayout.gravity = gravity.value()
             }
             homeAppsAlignment.observe(viewLifecycleOwner) { (gravity, onBottom) ->
-                val horizontalAlignment = if (onBottom) Gravity.BOTTOM else Gravity.CENTER_VERTICAL
-                binding.homeAppsLayout.gravity = gravity.value() or horizontalAlignment
+                val verticalAlignment = if (onBottom) Gravity.BOTTOM else Gravity.CENTER_VERTICAL
+                binding.homeAppsLayout.gravity = gravity.value() or verticalAlignment
 
                 binding.homeAppsLayout.children.forEach { view ->
                     (view as TextView).gravity = gravity.value()
@@ -163,8 +141,21 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
     }
 
     private fun homeAppClicked(location: Int) {
-        if (prefs.getAppName(location).isEmpty()) showLongPressToast()
-        else launchApp(prefs.getHomeAppModel(location))
+        val appModel = prefs.getHomeAppModel(location)
+
+        if (appModel.appLabel.isEmpty()) showLongPressToast()
+        else launchApp(appModel)
+    }
+
+    private fun homeAppLongClicked(view: View) {
+        if (prefs.homeLocked) return
+
+        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+
+        val location = view.id
+        // A slot that already has an app may also be given a hidden app.
+        val hasApp = prefs.getHomeAppModel(location).appLabel.isNotEmpty()
+        showAppList(AppDrawerFlag.SetHomeApp, showHiddenApps = hasApp, n = location)
     }
 
     private fun launchApp(appModel: AppModel) {
@@ -172,73 +163,59 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
     }
 
     private fun showAppList(flag: AppDrawerFlag, showHiddenApps: Boolean = false, n: Int = 0) {
-        viewModel.getAppList(showHiddenApps)
-        lifecycleScope.launch {
-            try {
-                findNavController().navigate(
-                    R.id.action_mainFragment_to_appListFragment,
-                    bundleOf("flag" to flag.toString(), "n" to n)
-                )
-            } catch (e: Exception) {
-                findNavController().navigate(
-                    R.id.appListFragment,
-                    bundleOf("flag" to flag.toString())
-                )
-                e.printStackTrace()
+        navigateFromHome(
+            R.id.action_mainFragment_to_appListFragment,
+            bundleOf("flag" to flag.toString(), "n" to n, "showHidden" to showHiddenApps)
+        )
+    }
+
+    /**
+     * Navigates only while home is the current screen. Gestures can fire twice in a row
+     * (two quick swipes, a long press racing a swipe) and must not stack screens.
+     */
+    private fun navigateFromHome(actionId: Int, args: Bundle? = null) {
+        if (!isAdded) return
+
+        try {
+            val navController = findNavController()
+            if (navController.currentDestination?.id == R.id.mainFragment) {
+                navController.navigate(actionId, args)
             }
+        } catch (e: Exception) {
+            Log.w(TAG, "Unable to navigate", e)
         }
     }
 
-    private fun openSwipeRightApp() {
-        if (prefs.appSwipeRight.appPackage.isNotEmpty())
-            launchApp(prefs.appSwipeRight)
-        else openDialerApp(requireContext())
+    private fun openGestureApp(appModel: AppModel, fallback: () -> Unit) {
+        if (appModel.appPackage.isNotEmpty()) launchApp(appModel) else fallback()
     }
 
-    private fun openSwipeDownApp() {
-        if (prefs.appSwipeDown.appPackage.isNotEmpty())
-            launchApp(prefs.appSwipeDown)
-        else openDialerApp(requireContext())
+    private fun openSwipeRightApp() = openGestureApp(prefs.appSwipeRight) { openDialerApp(requireContext()) }
+
+    private fun openSwipeDownApp() = openGestureApp(prefs.appSwipeDown) { openDialerApp(requireContext()) }
+
+    private fun openSwipeUpApp() = openGestureApp(prefs.appSwipeUp) { showAppList(AppDrawerFlag.LaunchApp) }
+
+    private fun openClickClockApp() = openGestureApp(prefs.appClickClock) { openAlarmApp(requireContext()) }
+
+    private fun openClickDateApp() = openGestureApp(prefs.appClickDate) { openCalendar(requireContext()) }
+
+    private fun openSwipeLeftApp() = openGestureApp(prefs.appSwipeLeft) { openCameraApp(requireContext()) }
+
+    private fun openDoubleTapApp() = openGestureApp(prefs.appDoubleTap) { openCameraApp(requireContext()) }
+
+    private fun performAction(action: Action, openApp: () -> Unit) {
+        if (action == Action.OpenApp) openApp() else handleOtherAction(action)
     }
 
-    private fun openSwipeUpApp() {
-        if (prefs.appSwipeUp.appPackage.isNotEmpty())
-            launchApp(prefs.appSwipeUp)
-        else showAppList(AppDrawerFlag.LaunchApp)
-    }
-
-    private fun openClickClockApp() {
-        if (prefs.appClickClock.appPackage.isNotEmpty())
-            launchApp(prefs.appClickClock)
-        else openAlarmApp(requireContext())
-    }
-
-    private fun openClickDateApp() {
-        if (prefs.appClickDate.appPackage.isNotEmpty())
-            launchApp(prefs.appClickDate)
-        else openCalendar(requireContext())
-    }
-
-    private fun openSwipeLeftApp() {
-        if (prefs.appSwipeLeft.appPackage.isNotEmpty())
-            launchApp(prefs.appSwipeLeft)
-        else openCameraApp(requireContext())
-    }
-
-    private fun openDoubleTapApp() {
-        if (prefs.appDoubleTap.appPackage.isNotEmpty())
-            launchApp(prefs.appDoubleTap)
-        else openCameraApp(requireContext())
-    }
-
-    // This function handles all swipe actions that a independent of the actual swipe direction
+    // This function handles all actions that are independent of the gesture that triggered them
     @SuppressLint("NewApi")
     private fun handleOtherAction(action: Action) {
-        when(action) {
+        when (action) {
             Action.ShowNotification -> expandNotificationDrawer(requireContext())
             Action.LockScreen -> lockPhone()
             Action.ShowAppList -> showAppList(AppDrawerFlag.LaunchApp)
-            Action.OpenApp -> {} // this should be handled in the respective onSwipe[Down,Right,Left] functions
+            Action.OpenApp -> {} // handled by the gesture specific open*App functions
             Action.OpenQuickSettings -> expandQuickSettings(requireContext())
             Action.ShowRecents -> initActionService(requireContext())?.showRecents()
             Action.Disabled -> {}
@@ -254,152 +231,77 @@ class HomeFragment : Fragment(), View.OnClickListener, View.OnLongClickListener 
                 openAccessibilitySettings(requireContext())
             }
         } else {
-            requireActivity().runOnUiThread {
-                try {
-                    deviceManager.lockNow()
-                } catch (e: SecurityException) {
-                    showToastLong(requireContext(), "App does not have the permission to lock the device")
-                } catch (e: Exception) {
-                    showToastLong(requireContext(), "Olauncher failed to lock device.\nPlease check your app settings.")
-                    prefs.lockModeOn = false
-                }
+            try {
+                deviceManager.lockNow()
+            } catch (e: SecurityException) {
+                showToastLong(requireContext(), "App does not have the permission to lock the device")
+            } catch (e: Exception) {
+                showToastLong(requireContext(), "Olauncher failed to lock device.\nPlease check your app settings.")
+                prefs.lockModeOn = false
             }
         }
     }
 
     private fun showLongPressToast() = showToastShort(requireContext(), "Long press to select app")
 
-    private fun textOnClick(view: View) = onClick(view)
-
-    private fun textOnLongClick(view: View) = onLongClick(view)
-
     private fun getHomeScreenGestureListener(context: Context): View.OnTouchListener {
         return object : OnSwipeTouchListener(context) {
-            override fun onSwipeLeft() {
-                super.onSwipeLeft()
-                when(val action = prefs.swipeLeftAction) {
-                    Action.OpenApp -> openSwipeLeftApp()
-                    else -> handleOtherAction(action)
-                }
-            }
+            override fun onSwipeLeft() = performAction(prefs.swipeLeftAction, ::openSwipeLeftApp)
 
-            override fun onSwipeRight() {
-                super.onSwipeRight()
-                when(val action = prefs.swipeRightAction) {
-                    Action.OpenApp -> openSwipeRightApp()
-                    else -> handleOtherAction(action)
-                }
-            }
+            override fun onSwipeRight() = performAction(prefs.swipeRightAction, ::openSwipeRightApp)
 
-            override fun onSwipeUp() {
-                super.onSwipeUp()
-                when(val action = prefs.swipeUpAction) {
-                    Action.OpenApp -> openSwipeUpApp()
-                    else -> handleOtherAction(action)
-                }
-            }
+            override fun onSwipeUp() = performAction(prefs.swipeUpAction, ::openSwipeUpApp)
 
-            override fun onSwipeDown() {
-                super.onSwipeDown()
-                when(val action = prefs.swipeDownAction) {
-                    Action.OpenApp -> openSwipeDownApp()
-                    else -> handleOtherAction(action)
-                }
-            }
+            override fun onSwipeDown() = performAction(prefs.swipeDownAction, ::openSwipeDownApp)
+
+            override fun onDoubleClick() = performAction(prefs.doubleTapAction, ::openDoubleTapApp)
 
             override fun onLongClick() {
-                super.onLongClick()
-                try {
-                    findNavController().navigate(R.id.action_mainFragment_to_settingsFragment)
-                    // viewModel.firstOpen(false)
-                } catch (e: java.lang.Exception) {
-                }
-            }
-
-            override fun onDoubleClick() {
-                super.onDoubleClick()
-                when(val action = prefs.doubleTapAction) {
-                    Action.OpenApp -> openDoubleTapApp()
-                    else -> handleOtherAction(action)
-                }
+                // Runs after a delay, so the view may already be gone.
+                val touchArea = _binding?.touchArea ?: return
+                touchArea.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                navigateFromHome(R.id.action_mainFragment_to_settingsFragment)
             }
         }
     }
 
     private fun getHomeAppsGestureListener(context: Context, view: View): View.OnTouchListener {
         return object : ViewSwipeTouchListener(context, view) {
-            override fun onLongClick(view: View) {
-                super.onLongClick(view)
-                textOnLongClick(view)
-            }
+            override fun onClick(view: View) = homeAppClicked(view.id)
 
-            override fun onClick(view: View) {
-                super.onClick(view)
-                textOnClick(view)
-            }
-            
-            override fun onSwipeLeft() {
-                super.onSwipeLeft()
-                when(val action = prefs.swipeLeftAction) {
-                    Action.OpenApp -> openSwipeLeftApp()
-                    else -> handleOtherAction(action)
-                }
-            }
+            override fun onLongClick(view: View) = homeAppLongClicked(view)
 
-            override fun onSwipeRight() {
-                super.onSwipeRight()
-                when(val action = prefs.swipeRightAction) {
-                    Action.OpenApp -> openSwipeRightApp()
-                    else -> handleOtherAction(action)
-                }
-            }
+            override fun onSwipeLeft() = performAction(prefs.swipeLeftAction, ::openSwipeLeftApp)
 
-            override fun onSwipeUp() {
-                super.onSwipeUp()
-                when(val action = prefs.swipeUpAction) {
-                    Action.OpenApp -> openSwipeUpApp()
-                    else -> handleOtherAction(action)
-                }
-            }
+            override fun onSwipeRight() = performAction(prefs.swipeRightAction, ::openSwipeRightApp)
 
-            override fun onSwipeDown() {
-                super.onSwipeDown()
-                when(val action = prefs.swipeDownAction) {
-                    Action.OpenApp -> openSwipeDownApp()
-                    else -> handleOtherAction(action)
-                }
-            }
+            override fun onSwipeUp() = performAction(prefs.swipeUpAction, ::openSwipeUpApp)
+
+            override fun onSwipeDown() = performAction(prefs.swipeDownAction, ::openSwipeDownApp)
         }
     }
 
-    // updates number of apps visible on home screen
-    // does nothing if number has not changed
+    // Updates the number of apps on the home screen. Does nothing if the number has not changed.
     private fun updateAppCount(newAppsNum: Int) {
-        val oldAppsNum = binding.homeAppsLayout.size // current number
-        val diff = oldAppsNum - newAppsNum
+        val layout = binding.homeAppsLayout
+        val oldAppsNum = layout.childCount
 
-        if (diff in 1 until oldAppsNum) { // 1 <= diff <= oldNumApps
-            binding.homeAppsLayout.children.drop(diff)
-        } else if (diff < 0) {
-            val alignment = prefs.homeAlignment.value() // make only one call to prefs and store here
+        if (newAppsNum < oldAppsNum) {
+            layout.removeViews(newAppsNum, oldAppsNum - newAppsNum)
+        } else if (newAppsNum > oldAppsNum) {
+            val alignment = prefs.homeAlignment.value()
+            val textSize = prefs.textSize.toFloat()
+            val width = if (prefs.extendHomeAppsArea) LinearLayout.LayoutParams.MATCH_PARENT else LinearLayout.LayoutParams.WRAP_CONTENT
 
-            // add all missing apps to list
             for (i in oldAppsNum until newAppsNum) {
-                val view = layoutInflater.inflate(R.layout.home_app_button, null) as TextView
-                view.apply {
-                    textSize = prefs.textSize.toFloat()
-                    id = i
-                    text = prefs.getHomeAppModel(i).appLabel
-                    setOnTouchListener(getHomeAppsGestureListener(context, this))
-                    if (!prefs.extendHomeAppsArea) {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT
-                        )
-                    }
-                    gravity = alignment
-                }
-                binding.homeAppsLayout.addView(view)
+                val view = layoutInflater.inflate(R.layout.home_app_button, layout, false) as TextView
+                view.id = i
+                view.text = prefs.getHomeAppModel(i).name
+                view.textSize = textSize
+                view.gravity = alignment
+                view.layoutParams = LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.WRAP_CONTENT)
+                view.setOnTouchListener(getHomeAppsGestureListener(view.context, view))
+                layout.addView(view)
             }
         }
     }

@@ -18,6 +18,11 @@ class ActionService : AccessibilityService() {
         return super.onUnbind(intent)
     }
 
+    override fun onDestroy() {
+        instance = WeakReference(null)
+        super.onDestroy()
+    }
+
     @RequiresApi(Build.VERSION_CODES.P)
     fun lockScreen(): Boolean {
         return performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)

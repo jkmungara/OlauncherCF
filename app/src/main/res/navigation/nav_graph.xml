@@ -13,20 +13,17 @@
         <action
             android:id="@+id/action_mainFragment_to_appListFragment"
             app:destination="@id/appListFragment"
-            app:enterAnim="@anim/nav_default_enter_anim"
-            app:exitAnim="@anim/nav_default_exit_anim"
-            app:popEnterAnim="@anim/nav_default_pop_enter_anim"
-            app:popExitAnim="@anim/nav_default_pop_exit_anim" />
+            app:enterAnim="@animator/nav_enter"
+            app:exitAnim="@animator/nav_exit"
+            app:popEnterAnim="@animator/nav_pop_enter"
+            app:popExitAnim="@animator/nav_pop_exit" />
         <action
             android:id="@+id/action_mainFragment_to_settingsFragment"
             app:destination="@id/settingsFragment"
-            app:enterAnim="@anim/nav_default_enter_anim"
-            app:exitAnim="@anim/nav_default_exit_anim"
-            app:popEnterAnim="@anim/nav_default_pop_enter_anim"
-            app:popExitAnim="@anim/nav_default_pop_exit_anim" />
-        <action
-            android:id="@+id/action_mainFragment_to_appListFragment2"
-            app:destination="@id/appListFragment" />
+            app:enterAnim="@animator/nav_enter"
+            app:exitAnim="@animator/nav_exit"
+            app:popEnterAnim="@animator/nav_pop_enter"
+            app:popExitAnim="@animator/nav_pop_exit" />
     </fragment>
 
     <fragment
@@ -37,10 +34,10 @@
         <action
             android:id="@+id/action_appListFragment_to_settingsFragment2"
             app:destination="@id/settingsFragment"
-            app:enterAnim="@anim/nav_default_enter_anim"
-            app:exitAnim="@anim/nav_default_exit_anim"
-            app:popEnterAnim="@anim/nav_default_pop_enter_anim"
-            app:popExitAnim="@anim/nav_default_pop_exit_anim"
+            app:enterAnim="@animator/nav_enter"
+            app:exitAnim="@animator/nav_exit"
+            app:popEnterAnim="@animator/nav_pop_enter"
+            app:popExitAnim="@animator/nav_pop_exit"
             app:popUpTo="@+id/appListFragment"
             app:popUpToInclusive="true" />
     </fragment>
@@ -48,14 +45,14 @@
         android:id="@+id/settingsFragment"
         android:name="app.olaunchercf.ui.SettingsFragment"
         android:label="SettingsFragment"
-        android:layout="@layout/fragment_settings">
+        tools:layout="@layout/fragment_settings">
         <action
             android:id="@+id/action_settingsFragment_to_appListFragment"
             app:destination="@id/appListFragment"
-            app:enterAnim="@anim/nav_default_enter_anim"
-            app:exitAnim="@anim/nav_default_exit_anim"
-            app:popEnterAnim="@anim/nav_default_pop_enter_anim"
-            app:popExitAnim="@anim/nav_default_pop_exit_anim" />
+            app:enterAnim="@animator/nav_enter"
+            app:exitAnim="@animator/nav_exit"
+            app:popEnterAnim="@animator/nav_pop_enter"
+            app:popExitAnim="@animator/nav_pop_exit" />
     </fragment>
 
 </navigation>

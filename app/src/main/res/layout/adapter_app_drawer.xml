@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:animateLayoutChanges="true">
+    android:layout_height="wrap_content">
 
     <FrameLayout
         android:id="@+id/appTitleFrame"
@@ -22,37 +22,34 @@
 
     </FrameLayout>
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <!-- Options shown on long press. A flat LinearLayout is all this row needs. -->
+    <LinearLayout
         android:id="@+id/appHideLayout"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:animateLayoutChanges="true"
         android:background="?attr/primaryColorInverseTrans90"
         android:clickable="true"
         android:focusable="true"
-        android:paddingHorizontal="@dimen/app_padding_vertical">
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/app_padding_vertical"
+        android:visibility="gone">
 
         <EditText
             android:id="@+id/appRenameEdit"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/appRename"
+            android:layout_weight="1"
             android:imeOptions="actionDone"
-            android:padding="@dimen/app_padding_vertical"
+            android:importantForAutofill="no"
             android:inputType="textShortMessage"
-            android:importantForAutofill="no" />
+            android:padding="@dimen/app_padding_vertical" />
 
         <TextView
             android:id="@+id/appRename"
             style="@style/TextSmall"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/appHide"
             android:padding="@dimen/app_padding_vertical"
             android:text="@string/rename"
             android:textAllCaps="true" />
@@ -61,26 +58,20 @@
             android:id="@+id/appHide"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@id/appInfo"
             android:contentDescription="@string/hide"
             android:padding="@dimen/app_padding_vertical"
-            android:src="@drawable/visibility_off"
-            app:tint="?attr/primaryColor" />
+            app:tint="?attr/primaryColor"
+            tools:src="@drawable/visibility_off" />
 
         <ImageView
             android:id="@+id/appInfo"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
             android:contentDescription="@string/app"
             android:padding="@dimen/app_padding_vertical"
             android:src="@drawable/ic_outline_info_24"
             app:tint="?attr/primaryColor" />
 
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    </LinearLayout>
 
 </FrameLayout>

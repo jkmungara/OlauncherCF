@@ -74,20 +74,12 @@
         <item name="android:textSize">@dimen/text_large</item>
     </style>
 
-    <style name="TextMedium" parent="TextDefault">
-        <item name="android:textSize">20sp</item>
-    </style>
-
     <style name="TextSmall" parent="TextDefault">
         <item name="android:textSize">@dimen/text_small</item>
     </style>
 
     <style name="TextSmallBold" parent="TextSmall">
         <item name="android:textStyle">bold</item>
-    </style>
-
-    <style name="TextSmallLight" parent="TextSmall">
-        <item name="android:textColor">@drawable/text_colors_light</item>
     </style>
 
 </resources>

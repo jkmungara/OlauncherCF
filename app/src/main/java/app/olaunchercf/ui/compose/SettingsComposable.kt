@@ -1,6 +1,9 @@
 package app.olaunchercf.ui.compose
 
 import SettingsTheme
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,8 +31,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.constraintlayout.compose.ConstraintLayout
-import androidx.constraintlayout.compose.Dimension
 import app.olaunchercf.R
 import app.olaunchercf.data.Constants
 import app.olaunchercf.data.EnumOption
@@ -50,6 +51,9 @@ object SettingsComposable {
                     RoundedCornerShape(CORNER_RADIUS),
                 )
                 .padding(20.dp)
+                // Inside the background, so the rounded tile itself grows and shrinks
+                // smoothly when a selector opens or closes.
+                .animateContentSize(animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing))
                 .fillMaxWidth()
         ) {
             content()
@@ -280,36 +284,18 @@ object SettingsComposable {
         disabledText: String = buttonText,
         fontSize: TextUnit = TextUnit.Unspecified,
     ) {
-        ConstraintLayout(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                title,
+                style = SettingsTheme.typography.item,
+                fontSize = fontSize,
+                modifier = Modifier.weight(1f),
+            )
 
-            val (text, button) = createRefs()
-
-            Box(
-                modifier = Modifier
-                    .constrainAs(text) {
-                        start.linkTo(parent.start)
-                        end.linkTo(button.start)
-                        top.linkTo(parent.top)
-                        bottom.linkTo(parent.bottom)
-                        width = Dimension.fillToConstraints
-                    },
-            ) {
-                Text(
-                    title,
-                    style = SettingsTheme.typography.item,
-                    fontSize = fontSize,
-                    modifier = Modifier.align(CenterStart)
-                )
-            }
-
-            TextButton(
-                onClick = onClick,
-                modifier = Modifier.constrainAs(button) {
-                    end.linkTo(parent.end)
-                    top.linkTo(parent.top)
-                    bottom.linkTo(parent.bottom)
-                },
-            ) {
+            TextButton(onClick = onClick) {
                 Text(
                     text = if (active) buttonText else disabledText,
                     style = if (active) SettingsTheme.typography.button else SettingsTheme.typography.buttonDisabled,
@@ -359,41 +345,13 @@ object SettingsComposable {
         onValueChange: (Int) -> Unit = {},
         onCommit: (Int) -> Unit
     ) {
-        ConstraintLayout(
+        Row(
             modifier = Modifier
                 .background(SettingsTheme.color.selector, SettingsTheme.shapes.settings)
-                .fillMaxWidth()
+                .fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            val (plus, minus, text, button) = createRefs()
-            TextButton(
-                onClick = {
-                    if (number.value > min) {
-                        number.value -= 1
-                        onValueChange(number.value)
-                    }
-                },
-                modifier = Modifier.constrainAs(minus) {
-                    top.linkTo(parent.top)
-                    bottom.linkTo(parent.bottom)
-                    start.linkTo(text.end)
-                    end.linkTo(button.start)
-                },
-            ) {
-                Text("-", style = SettingsTheme.typography.button, fontSize = fontSize)
-            }
-            Text(
-                text = number.value.toString(),
-                fontSize = fontSize,
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .constrainAs(text) {
-                        top.linkTo(parent.top)
-                        bottom.linkTo(parent.bottom)
-                        start.linkTo(plus.end)
-                        end.linkTo(minus.start)
-                    },
-                style = SettingsTheme.typography.item,
-            )
             TextButton(
                 onClick = {
                     if (number.value < max) {
@@ -401,23 +359,26 @@ object SettingsComposable {
                         onValueChange(number.value)
                     }
                 },
-                modifier = Modifier.constrainAs(plus) {
-                    top.linkTo(parent.top)
-                    bottom.linkTo(parent.bottom)
-                    start.linkTo(parent.start)
-                    end.linkTo(text.start)
-                },
             ) {
                 Text("+", style = SettingsTheme.typography.button, fontSize = fontSize)
             }
+            Text(
+                text = number.value.toString(),
+                fontSize = fontSize,
+                style = SettingsTheme.typography.item,
+            )
+            TextButton(
+                onClick = {
+                    if (number.value > min) {
+                        number.value -= 1
+                        onValueChange(number.value)
+                    }
+                },
+            ) {
+                Text("-", style = SettingsTheme.typography.button, fontSize = fontSize)
+            }
             TextButton(
                 onClick = { onCommit(number.value) },
-                modifier = Modifier.constrainAs(button) {
-                    top.linkTo(parent.top)
-                    bottom.linkTo(parent.bottom)
-                    start.linkTo(minus.end)
-                    end.linkTo(parent.end)
-                },
             ) {
                 Text(stringResource(R.string.save), style = SettingsTheme.typography.button, fontSize = fontSize)
             }

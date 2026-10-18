@@ -4,7 +4,7 @@ import android.annotation.SuppressLint
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import app.olaunchercf.R
-import java.util.*
+import java.util.Locale
 
 interface EnumOption {
     @Composable
@@ -13,20 +13,8 @@ interface EnumOption {
 
 object Constants {
 
-    /*const val FLAG_LAUNCH_APP = 100
-    const val FLAG_HIDDEN_APPS = 101
-
-    const val FLAG_SET_HOME_APP = 1
-
-    const val FLAG_SET_SWIPE_LEFT_APP = 11
-    const val FLAG_SET_SWIPE_RIGHT_APP = 12
-
-    const val FLAG_SET_CLICK_CLOCK_APP = 13
-    const val FLAG_SET_CLICK_DATE_APP = 14*/
-
     const val REQUEST_CODE_ENABLE_ADMIN = 666
 
-    const val TRIPLE_TAP_DELAY_MS = 300
     const val LONG_PRESS_DELAY_MS = 500
 
     const val MAX_HOME_APPS = 15
@@ -104,33 +92,36 @@ object Constants {
         }
     }
 
-    fun Language.value(): String {
-        return when(this) {
-            Language.System -> Locale.getDefault().language
-            Language.Arabic -> "ar"
-            Language.Chinese -> "cn"
-            Language.Croatian -> "hr"
-            Language.Dutch -> "nl"
-            Language.English -> "en"
-            Language.Estonian -> "et"
-            Language.French -> "fr"
-            Language.German -> "de"
-            Language.Greek -> "gr"
-            Language.Indonesian -> "id"
-            Language.Italian -> "it"
-            Language.Japanese -> "ja"
-            Language.Korean -> "ko"
-            Language.Lithuanian -> "lt"
-            Language.Persian -> "fa"
-            Language.Portuguese -> "pt"
-            Language.Russian -> "ru"
-            Language.Spanish -> "es"
-            Language.Swedish -> "se"
-            Language.Thai -> "th"
-            Language.Turkish -> "tr"
-            Language.Vietnamese -> "vi"
+    /** Locale used for the app's resources. Regions match the translated resource folders. */
+    fun Language.locale(): Locale {
+        return when (this) {
+            Language.System -> Locale.getDefault()
+            Language.Arabic -> Locale("ar", "SA")
+            Language.Chinese -> Locale.SIMPLIFIED_CHINESE
+            Language.Croatian -> Locale("hr", "HR")
+            Language.Dutch -> Locale("nl", "NL")
+            Language.English -> Locale.ENGLISH
+            Language.Estonian -> Locale("et", "EE")
+            Language.French -> Locale("fr", "FR")
+            Language.German -> Locale("de", "DE")
+            Language.Greek -> Locale("el", "GR")
+            Language.Indonesian -> Locale("in", "ID")
+            Language.Italian -> Locale("it", "IT")
+            Language.Japanese -> Locale("ja", "JP")
+            Language.Korean -> Locale("ko", "KR")
+            Language.Lithuanian -> Locale("lt", "LT")
+            Language.Persian -> Locale("fa", "IR")
+            Language.Portuguese -> Locale("pt", "BR")
+            Language.Russian -> Locale("ru", "RU")
+            Language.Spanish -> Locale("es", "ES")
+            Language.Swedish -> Locale("sv", "SE")
+            Language.Thai -> Locale("th", "TH")
+            Language.Turkish -> Locale("tr", "TR")
+            Language.Vietnamese -> Locale("vi", "VN")
         }
     }
+
+    fun Language.value(): String = locale().language
 
     enum class Gravity: EnumOption {
         Left,

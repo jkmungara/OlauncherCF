@@ -1,20 +1,19 @@
 package app.olaunchercf.data
 
 import android.os.UserHandle
-import java.text.CollationKey
 
 data class AppModel(
-        val appLabel: String,
-        val key: CollationKey?,
-        val appPackage: String,
-        val appActivityName: String,
-        val user: UserHandle,
-        var appAlias: String
-) : Comparable<AppModel> {
-    override fun compareTo(other: AppModel): Int = when {
-        key != null && other.key != null -> key.compareTo(other.key)
-        else -> appLabel.compareTo(other.appLabel, true)
-    }
+    val appLabel: String,
+    val appPackage: String,
+    val appActivityName: String,
+    val user: UserHandle,
+    val appAlias: String,
+) {
+    /** Name shown to the user: the alias if one is set, otherwise the system label. */
+    val name: String
+        get() = appAlias.ifEmpty { appLabel }
 
-    var name: String = appAlias.ifEmpty { appLabel }
+    /** Key under which this app is stored in the hidden apps set. */
+    val hiddenKey: String
+        get() = "$appPackage|$user"
 }
